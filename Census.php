@@ -177,6 +177,8 @@ if(isset($argv) && $argv[1] == "demo"){
   header("Content-Type: text/plain");
 
   $census = new Census($api_key, true);
-  $cities = $census->getCityDataByState("Texas");
+
+  $state = (isset($argv[2]))?$argv[2]:"Texas";
+  $cities = $census->getCityDataByState($state);
   print_r($cities);
 }
