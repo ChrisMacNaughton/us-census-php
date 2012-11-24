@@ -115,9 +115,6 @@ class Census {
 
           $name = str_replace(" village", "", $name);
         }
-//        $city2 = $cities2[$key];
-//        $city3 = $cities3[$key];
-//        $city = array_merge($city, $city2, $city3);
 
         foreach($city as $i=>$value){
           if($keys[$i] == 'state' OR $keys[$i] == 'place'){
@@ -169,10 +166,17 @@ class Census {
     return $data;
   }
 }
+/*
+This piece lets users test run the library's functions without having to actually set it up in their own application
 
-include ('config.php');
-header("Content-Type: text/plain");
+Coming Soon: Examples using the library!
+*/
 
-$census = new Census($api_key, true);
-$cities = $census->getCityDataByState("Texas");
-print_r($cities);
+if(isset($argv) && $argv[1] == "demo"){
+  include ('config.php');
+  header("Content-Type: text/plain");
+
+  $census = new Census($api_key, true);
+  $cities = $census->getCityDataByState("Texas");
+  print_r($cities);
+}
