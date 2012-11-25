@@ -3,6 +3,10 @@
 class Census {
   protected $key;
   protected $census = "http://api.census.gov/data/2010/";
+  protected $type = array(
+    "ACS5"=>"acs5",
+    "SF1"=>"sf1"
+  );
   protected $sf = "sf1";
   protected $acs = "acs5";
   protected static $states = array();
@@ -66,107 +70,100 @@ class Census {
 
     return json_decode($data, true);
   }
-  public function getCityDataByState($state, $args = array()){
+  public function getPlaceNamesByState($state){
+    $id = self::$states[$state];
+    $url = $this->census . "sf1?key=".$this->key."&get=NAME&for=place:*&in=state:".$id;
+    $ch = curl_init($url);
+
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $cities = json_decode(curl_exec($ch), true);
+    $ch = null;
+
+    $keys = $cities[0];
+
+    unset($cities[0]);
+    foreach($cities as $city){
+      $tmp[$city[2]] = $city[0];
+    }
+    $cities = $tmp;
+    return $cities;
+  }
+  public function getCityDataByState($state, $type = "ACS5", $args = array()){
     if(!is_array($args)){
       $args = array($args);
     }
+
     if(count($args) > 100){
       throw new Exception("Too many variables requested, limit to 100");
     }
+    $names = $this->getPlaceNamesByState($state);
+    $variables = $this->getOptions($type);
     $state = $state;
     $id = self::$states[$state];
-    if($this->cache){
-      if(file_exists($this->path . "/cache/state_".$state."_cache.json")){
-        $f = fopen($this->path . "/cache/state_".$state."_cache.json", "r");
-        $this->census_data[$state] = json_decode(fread($f, filesize($this->path . "/cache/state_".$state."_cache.json")), true);
-        fclose($f);
+
+    $url = $this->census . $this->type[$type] . "?key=" . $this->key . "&get=".implode(',',$args)."&for=place:*&in=state:".$id;
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $cities = json_decode(curl_exec($ch), true);
+    $ch = null;
+    //print_r($cities);
+
+    //$keys = array_merge($cities[0], $cities2[0], $cities3[0]);
+    //print_r($keys);
+    $keys = $cities[0];
+    unset($cities[0]);//unset($cities2[0]);unset($cities3[0]);
+
+    $data = array();
+    $class="";
+    foreach($cities as $key=>$city){
+      $name = $names[$city[2]];
+      if(strpos($name, 'city')){
+        $class="City";
+
+        $name = str_replace(" city", "", $name);
       }
-    }
-    if(!isset($this->census_data[$state])){
+      if(strpos($name, 'CDP')){
+        $class="CDP";
 
-      $url = $this->census . $this->acs . "?key=" . $this->key . "&get=".implode(',',$args)."&for=place:*&in=state:".$id;
-      $ch = curl_init($url);
-      curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-      $cities = json_decode(curl_exec($ch), true);
-      $ch = null;
-      //print_r($cities);
-
-      //$keys = array_merge($cities[0], $cities2[0], $cities3[0]);
-      //print_r($keys);
-      $keys = $cities[0];
-      unset($cities[0]);//unset($cities2[0]);unset($cities3[0]);
-      $data = array();
-      $class="";
-      foreach($cities as $key=>$city){
-        $name = $city[1];
-        if(strpos($name, 'city')){
-          $class="City";
-
-          $name = str_replace(" city", "", $name);
-        }
-        if(strpos($name, 'CDP')){
-          $class="CDP";
-
-          $name = str_replace(" CDP", "", $name);
-        }
-        if(strpos($name, 'town')){
-          $class="Town";
-
-          $name = str_replace(" town", "", $name);
-        }
-        if(strpos($name, 'village')){
-          $class="Village";
-
-          $name = str_replace(" village", "", $name);
-        }
-
-        foreach($city as $i=>$value){
-          if($keys[$i] == 'state' OR $keys[$i] == 'place'){
-            $k = ($keys[$i] == 'state')?'state':'place';
-          } else
-            $k = $this->names[$keys[$i]];
-          //print($k." - ");
-          $tmp[$k]=$value;
-        }
-        //exit();
-        //print_r($tmp);
-        $city = $tmp;
-        //$class = substr($name, -1, strlen($name) - strrpos($name, ' '));
-        //$name = substr($name, 0, strrpos($name, ''));
-        //print_r($city);
-        //exit();
-        $data[$city['place']] = array(
-//          'id'=>hash('sha256',$state.$name),
-          'place_id'=>$city['place'],
-          'state_id'=>$city['state'],
-          'state'=>$state,
-          'state_safe'=>str_replace(' ', '-', $state),
-          'name'=>$name,
-          'name_safe'=>str_replace(' ', '-', $name),
-          'class'=>$class,
-          'population'=>(int)$city['population'],
-          'median_income'=>(int)$city['median_household_income'],
-          'travel'=>array(
-            '10-14'=>(int)($city['10-14'] != 'null')?$city['10-14']:0,
-            '15-19'=>(int)($city['15-19'] != 'null')?$city['15-19']:0,
-            '20-24'=>(int)($city['20-24'] != 'null')?$city['20-24']:0,
-            '25-29'=>(int)($city['25-29'] != 'null')?$city['25-29']:0,
-            '30-34'=>(int)($city['30-34'] != 'null')?$city['30-34']:0,
-            '35-44'=>(int)($city['35-44'] != 'null')?$city['35-44']:0,
-            '45-59'=>(int)($city['45-59'] != 'null')?$city['45-59']:0,
-            '60+'=>(int)($city['60+'] != 'null')?$city['60+']:0
-          )
-        );
-        //print_r($data[$city['place']]);
-        $city = null;
+        $name = str_replace(" CDP", "", $name);
       }
-      $this->census_data[$state] = $data;
-      $f = fopen($this->path . "/cache/state_".$state."_cache.json", "w");
-      fwrite($f, json_encode($data));
-      fclose($f);
-    } else {
-      $data = $this->census_data[$state];
+      if(strpos($name, 'town')){
+        $class="Town";
+
+        $name = str_replace(" town", "", $name);
+      }
+      if(strpos($name, 'village')){
+        $class="Village";
+
+        $name = str_replace(" village", "", $name);
+      }
+
+      foreach($city as $i=>$value){
+
+        if($keys[$i] == 'state' OR $keys[$i] == 'place'){
+          $k = ($keys[$i] == 'state')?'state':'place';
+        } else
+          $k = $variables[$keys[$i]]['name'];
+        //print($k." - ");
+        $tmp[$k]=($value != "null")?$value:0;
+        $tmp['state'] = $state;
+        $tmp['name'] = $name;
+        $tmp['class'] = $class;
+        //print($k."-".$value."\n");
+      }
+      //exit();
+      //print_r($tmp);
+      $city = $tmp;
+      //$class = substr($name, -1, strlen($name) - strrpos($name, ' '));
+      //$name = substr($name, 0, strrpos($name, ''));
+      //print_r($city);
+      //exit();
+      $data[$city['place']] = $city;
+      //print_r($data[$city['place']]);
+      $city = null;
     }
+//
     return $data;
   }
 }
