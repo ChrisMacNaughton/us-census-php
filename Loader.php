@@ -18,10 +18,10 @@ for($i=0; $i<= $limit; $i++){
       'name'=>htmlentities((string)$entry)
     );
     //print_r($entry); exit();
-    $entries["ACS5"][] = $entry;
+    $entries["ACS5"][$entry['key']] = $entry;
   }
 }
-
+print("Finished loading ACS5, starting SF1\n");
 $xml = simplexml_load_file('http://www.census.gov/developers/data/sf1.xml');
 
 $counter = 0;
@@ -41,12 +41,12 @@ for($i=0; $i<= $limit; $i++){
       'name'=>htmlentities((string)$entry)
     );
     //print_r($entry); exit();
-    $entries["SF1"][] = $entry;
+    $entries["SF1"][$entry['key']] = $entry;
   }
 }
 $xml = null;
-
-$write  false;
+print("Finished SF1!\n");
+$write = false;
 if(file_exists("data/SF1.json")){
   $f = fopen("data/SF1.json", "r");
   if(json_encode($entries["SF1"]) != fread($f, filesize("data/SF1.json"))){
@@ -54,6 +54,8 @@ if(file_exists("data/SF1.json")){
     unlink("data/SF1.json");
     $write = true;
   }
+} else {
+  $write = true;
 }
 if($write){
   $f = fopen("data/SF1.json", "w");
@@ -69,9 +71,12 @@ if(file_exists("data/ACS5.json")){
     unlink("data/ACS5.json");
     $write = true;
   }
+} else {
+  $write = true;
 }
 if($write){
   $f = fopen("data/ACS5.json", "w");
   fwrite($f, json_encode($entries["ACS5"]));
   fclose($f);
 }
+print("Done!");

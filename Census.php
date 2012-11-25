@@ -6,44 +6,27 @@ class Census {
   protected $sf = "sf1";
   protected $acs = "acs5";
   protected static $states = array();
-  protected static $ACS_get=array(
-    'median_household_income'=>'B19013_001E',
-    'name'=>"NAME",
-    "population"=>'B01003_001E',
-    'agregate_travel_time_to_work'=>'B08135_001E',
-    "less_than_10_minutes"=>'B08135_002E',
-    "10-14"=>'B08135_003E',
-    "15-19"=>'B08135_004E',
-    "20-24"=>'B08135_005E',
-    "25-29"=>'B08135_006E',
-    "30-34"=>'B08135_007E',
-    "35-44"=>'B08135_008E',
-    "45-59"=>'B08135_009E',
-    "60+"=>'B08135_010E',
 
-  );
   protected $census_data = array();
-  public function __construct($api_key, $cache=false){
+  public function __construct($api_key, $cache=true){
+    $this->path = dirname(__file__);
     $this->key = $api_key;
     $this->cache = $cache;
     if($cache){
-      if(file_exists("cache/states_cache.json")){
-        $f = fopen("cache/states_cache.json", "r");
-        self::$states = json_decode(fread($f, filesize("cache/states_cache.json")), true);
+      if(file_exists($this->path . "/cache/states_cache.json")){
+        $f = fopen($this->path . "/cache/states_cache.json", "r");
+        self::$states = json_decode(fread($f, filesize($this->path . "/cache/states_cache.json")), true);
         fclose($f);
       } else {
         $this->getStateIds();
-        $f = fopen("cache/states_cache.json", "w");
+        $f = fopen($this->path . "/cache/states_cache.json", "w");
         fwrite($f, json_encode(self::$states));
         fclose($f);
       }
     } else {
       $this->getStateIds();
     }
-    $this->names = array();
-    foreach(self::$ACS_get as $key=>$id){
-      $this->names[$id]=$key;
-    }
+
   }
   public function getStates(){
     foreach(self::$states as $state=>$id){
@@ -67,20 +50,41 @@ class Census {
       self::$states = $data;
     }
   }
-  public function getCityDataByState($state){
+  public function getOptions($type = null){
+    if(is_null($type)){
+      throw new Exception("You have to choose the type: ACS5 or SF1");
+    }
+    if(strtoupper($type) != "ACS5" AND strtoupper($type) != "SF1"){
+      throw new Exception("Type must be either ACS5 or SF1");
+    }
+    if(!file_exists($this->path . '/data/'.strtoupper($type).'.json')){
+      throw new Exception("You must load Loader.php first to load this data");
+    }
+    $f =fopen($this->path . '/data/'.strtoupper($type).'.json', "r");
+    $data = fread($f, filesize($this->path . '/data/'.strtoupper($type).'.json'));
+    fclose($f);
+
+    return json_decode($data, true);
+  }
+  public function getCityDataByState($state, $args = array()){
+    if(!is_array($args)){
+      $args = array($args);
+    }
+    if(count($args) > 100){
+      throw new Exception("Too many variables requested, limit to 100");
+    }
     $state = $state;
     $id = self::$states[$state];
     if($this->cache){
-      if(file_exists("cache/state_".$state."_cache.json")){
-        $f = fopen("cache/state_".$state."_cache.json", "r");
-        $this->census_data[$state] = json_decode(fread($f, filesize("cache/state_".$state."_cache.json")), true);
+      if(file_exists($this->path . "/cache/state_".$state."_cache.json")){
+        $f = fopen($this->path . "/cache/state_".$state."_cache.json", "r");
+        $this->census_data[$state] = json_decode(fread($f, filesize($this->path . "/cache/state_".$state."_cache.json")), true);
         fclose($f);
       }
     }
     if(!isset($this->census_data[$state])){
-      $args1 = array_slice(self::$ACS_get, 0, count(self::$ACS_get)+1, true);
 
-      $url = $this->census . $this->acs . "?key=" . $this->key . "&get=".implode(',',$args1)."&for=place:*&in=state:".$id;
+      $url = $this->census . $this->acs . "?key=" . $this->key . "&get=".implode(',',$args)."&for=place:*&in=state:".$id;
       $ch = curl_init($url);
       curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
       $cities = json_decode(curl_exec($ch), true);
@@ -157,7 +161,7 @@ class Census {
         $city = null;
       }
       $this->census_data[$state] = $data;
-      $f = fopen("cache/state_".$state."_cache.json", "w");
+      $f = fopen($this->path . "/cache/state_".$state."_cache.json", "w");
       fwrite($f, json_encode($data));
       fclose($f);
     } else {
