@@ -34,7 +34,7 @@ class Census {
   }
   public function getStates(){
     foreach(self::$states as $state=>$id){
-      $data[] = $state;
+      $data[$id] = $state;
     }
     return $data;
   }
